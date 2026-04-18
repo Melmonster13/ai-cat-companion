@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 
 def predict_mood(model, cat_encoder, label_encoder, input_dict):
     """
@@ -14,8 +15,10 @@ def predict_mood(model, cat_encoder, label_encoder, input_dict):
     cat_cols = ["activity", "tail_position", "ear_direction"]
     num_cols = ["time_of_day", "food_eaten"]
 
-    cat_values = np.array([[input_dict[c] for c in cat_cols]])
-    cat_encoded = cat_encoder.transform(cat_values)
+    # Use a DataFrame to preserve str dtype — np.array converts to np.str_
+    # which OrdinalEncoder treats as an unknown category
+    cat_df = pd.DataFrame([[input_dict[c] for c in cat_cols]], columns=cat_cols)
+    cat_encoded = cat_encoder.transform(cat_df)
 
     num_values = np.array([[input_dict[c] for c in num_cols]])
     X = np.hstack([num_values, cat_encoded])
