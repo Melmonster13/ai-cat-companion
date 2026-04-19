@@ -10,7 +10,7 @@ from src.game.xp_system import (
     record_correction, get_accuracy, xp_to_next_level,
     XP_THRESHOLDS,
 )
-from src.game.sprite_manager import get_cat_image
+from src.game.sprite_manager import get_cat_image, LEVEL_STYLE, get_mood_caption
 from src.game.feedback_loop import save_correction, correction_count
 
 # ── Page config ──────────────────────────────────────────────
@@ -46,12 +46,41 @@ st.caption("Enter your cat's behavior and see what mood the AI predicts.")
 # ── Cat display ───────────────────────────────────────────────
 mood_to_show = st.session_state.last_prediction or "happy"
 cat_img = get_cat_image(mood_to_show, state["level"])
-st.image(cat_img, width=200)
 
-level_label = XP_THRESHOLDS[state["level"]]["label"]
-st.markdown(f"**{level_label}** | XP: {state['xp']} | "
-            f"Accuracy: {get_accuracy(state)*100:.1f}%")
-st.progress(min(state["xp"] / 100, 1.0))
+col_cat, col_info = st.columns([1, 2])
+with col_cat:
+    st.image(cat_img, width=220)
+
+with col_info:
+    level_label = XP_THRESHOLDS[state["level"]]["label"]
+    badge = LEVEL_STYLE[state["level"]][2]
+    st.markdown(f"### {badge} {level_label}")
+    st.markdown(f"**XP:** {state['xp']}")
+    st.markdown(f"**Accuracy:** {get_accuracy(state)*100:.1f}%")
+    st.markdown(f"**Predictions:** {state['total_predictions']}")
+    st.progress(min(state['xp'] / 100, 1.0))
+
+    needed_xp, needed_acc = xp_to_next_level(state)
+    if needed_xp:
+        st.caption(f"Next level: {needed_xp} more XP + "
+                   f"{needed_acc*100:.0f}% accuracy needed")
+    else:
+        st.caption("👑 Maximum level reached!")
+
+    st.markdown(get_mood_caption(mood_to_show))
+
+# ── Mood history ──────────────────────────────────────────────
+if "mood_history" not in st.session_state:
+    st.session_state.mood_history = []
+
+if st.session_state.last_prediction:
+    history = st.session_state.mood_history
+    if not history or history[-1] != st.session_state.last_prediction:
+        history.append(st.session_state.last_prediction)
+        st.session_state.mood_history = history[-8:]  # keep last 8
+
+if st.session_state.mood_history:
+    st.caption("Recent moods: " + "  →  ".join(st.session_state.mood_history))
 
 st.divider()
 
