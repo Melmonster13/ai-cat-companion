@@ -2,7 +2,8 @@ import csv
 from pathlib import Path
 from datetime import datetime
 
-FEEDBACK_PATH = Path("data/feedback/user_corrections.csv")
+ROOT = Path(__file__).resolve().parent.parent.parent
+FEEDBACK_PATH = ROOT / "data" / "feedback" / "user_corrections.csv"
 FIELDNAMES = [
     "timestamp", "time_of_day", "activity", "tail_position",
     "ear_direction", "food_eaten", "predicted_mood", "corrected_mood"

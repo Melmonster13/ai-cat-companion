@@ -1,6 +1,9 @@
 import json
 from pathlib import Path
 
+ROOT = Path(__file__).resolve().parent.parent.parent
+DEFAULT_FEEDBACK_PATH = ROOT / "data" / "feedback" / "xp_state.json"
+
 XP_THRESHOLDS = {
     "rookie":    {"min_xp": 0,   "required_accuracy": 0.0,  "label": "Rookie Cat"},
     "learner":   {"min_xp": 10,  "required_accuracy": 0.75, "label": "Learner Cat"},
@@ -17,16 +20,17 @@ DEFAULT_STATE = {
     "corrections": [],
 }
 
-def load_state(path="data/feedback/xp_state.json"):
-    p = Path(path)
+def load_state(path=None):
+    p = Path(path) if path else DEFAULT_FEEDBACK_PATH
     if p.exists():
         with open(p) as f:
             return json.load(f)
     return DEFAULT_STATE.copy()
 
-def save_state(state, path="data/feedback/xp_state.json"):
-    Path(path).parent.mkdir(parents=True, exist_ok=True)
-    with open(path, "w") as f:
+def save_state(state, path=None):
+    p = Path(path) if path else DEFAULT_FEEDBACK_PATH
+    p.parent.mkdir(parents=True, exist_ok=True)
+    with open(p, "w") as f:
         json.dump(state, f, indent=2)
 
 def record_prediction(state, correct: bool):

@@ -11,7 +11,7 @@ from src.game.xp_system import (
     XP_THRESHOLDS,
 )
 from src.game.sprite_manager import get_cat_image, LEVEL_STYLE, get_mood_caption
-from src.game.feedback_loop import save_correction, correction_count
+from src.game.feedback_loop import save_correction, correction_count, load_corrections
 
 # ── Page config ──────────────────────────────────────────────
 st.set_page_config(page_title="AI Cat Companion", page_icon="🐱", layout="centered")
@@ -36,12 +36,22 @@ if "last_prediction" not in st.session_state:
     st.session_state.last_prediction = None
 if "last_input" not in st.session_state:
     st.session_state.last_input = None
+if "just_levelled_up" not in st.session_state:
+    st.session_state.just_levelled_up = None
 
 state = st.session_state.xp_state
 
 # ── Header ────────────────────────────────────────────────────
 st.title("🐱 AI Cat Companion")
 st.caption("Enter your cat's behavior and see what mood the AI predicts.")
+
+# ── Level-up banner ───────────────────────────────────────────
+if st.session_state.just_levelled_up:
+    new_level = st.session_state.just_levelled_up
+    label = XP_THRESHOLDS[new_level]["label"]
+    badge = LEVEL_STYLE[new_level][2]
+    st.success(f"## {badge} LEVEL UP! You reached **{label}**! {badge}")
+    st.session_state.just_levelled_up = None
 
 # ── Cat display ───────────────────────────────────────────────
 mood_to_show = st.session_state.last_prediction or "happy"
@@ -125,9 +135,12 @@ if st.session_state.last_prediction:
 
     with col_yes:
         if st.button("✅ Yes, that's right!"):
+            prev_level = state["level"]
             state = record_prediction(state, correct=True)
             save_state(state)
             st.session_state.xp_state = state
+            if state["level"] != prev_level:
+                st.session_state.just_levelled_up = state["level"]
             st.balloons()
             st.rerun()
 
@@ -138,12 +151,15 @@ if st.session_state.last_prediction:
             key="correction_select"
         )
         if st.button("❌ Correct the prediction"):
+            prev_level = state["level"]
             save_correction(st.session_state.last_input, pred, correct_mood)
             state = record_prediction(state, correct=False)
             state = record_correction(state, pred, correct_mood,
                                       st.session_state.last_input)
             save_state(state)
             st.session_state.xp_state = state
+            if state["level"] != prev_level:
+                st.session_state.just_levelled_up = state["level"]
             st.info(f"Saved correction: {pred} → {correct_mood}. "
                     f"Total corrections: {correction_count()}")
             st.rerun()
@@ -153,3 +169,33 @@ if st.session_state.last_prediction:
     if needed_xp:
         st.caption(f"Next level in {needed_xp} XP "
                    f"(need {needed_acc*100:.0f}% accuracy)")
+
+# ── Correction history ────────────────────────────────────────
+corrections = load_corrections()
+if corrections:
+    st.divider()
+    st.subheader("📋 Correction History")
+    st.caption(f"{len(corrections)} correction(s) saved — "
+               f"this data will train the RL agent in Phase 3.")
+
+    # Most confused pairs
+    from collections import Counter
+    pairs = Counter(
+        f"{c['predicted_mood']} → {c['corrected_mood']}"
+        for c in corrections
+    )
+    st.markdown("**Most common mistakes:**")
+    for pair, count in pairs.most_common(3):
+        st.markdown(f"- `{pair}` × {count}")
+
+    # Recent corrections table
+    import pandas as pd
+    df_corrections = pd.DataFrame(corrections[-10:]).iloc[::-1]
+    df_corrections = df_corrections[
+        ["timestamp", "predicted_mood", "corrected_mood",
+         "activity", "food_eaten"]
+    ]
+    df_corrections.columns = [
+        "Time", "Predicted", "Corrected", "Activity", "Food"
+    ]
+    st.dataframe(df_corrections, use_container_width=True, hide_index=True)
