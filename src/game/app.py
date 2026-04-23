@@ -16,16 +16,44 @@ from src.game.feedback_loop import save_correction, correction_count, load_corre
 # ── Page config ──────────────────────────────────────────────
 st.set_page_config(page_title="AI Cat Companion", page_icon="🐱", layout="centered")
 
-# ── Load models ───────────────────────────────────────────────
+# ── Load models (bootstrap if missing) ────────────────────────
 @st.cache_resource
 def load_models():
     root = Path(__file__).resolve().parent.parent.parent
     models = root / "artifacts" / "models"
+    required = ["rf_model.pkl", "cat_encoder.pkl", "label_encoder.pkl"]
+
+    if not all((models / f).exists() for f in required):
+        with st.spinner("First-time setup: generating dataset and training models..."):
+            _bootstrap_models(root)
+
     return (
         joblib.load(models / "rf_model.pkl"),
         joblib.load(models / "cat_encoder.pkl"),
         joblib.load(models / "label_encoder.pkl"),
     )
+
+def _bootstrap_models(root: Path):
+    """Regenerate dataset + train models if artifacts are missing (Streamlit Cloud cold start)."""
+    from src.data.generate_synthetic import generate_dataset
+    from src.data.preprocess import load_and_clean, encode_features
+    from src.models.train import train_models, save_model
+
+    raw_path = root / "data" / "raw" / "cat_behavior_synthetic.csv"
+    if not raw_path.exists():
+        raw_path.parent.mkdir(parents=True, exist_ok=True)
+        df = generate_dataset()
+        df.to_csv(raw_path, index=False)
+
+    df = load_and_clean(str(raw_path))
+    X, y, cat_enc, label_enc = encode_features(df)
+    results = train_models(X, y)
+
+    out = root / "artifacts" / "models"
+    out.mkdir(parents=True, exist_ok=True)
+    save_model(results["random_forest"], str(out / "rf_model.pkl"))
+    save_model(cat_enc,   str(out / "cat_encoder.pkl"))
+    save_model(label_enc, str(out / "label_encoder.pkl"))
 
 model, cat_enc, label_enc = load_models()
 
